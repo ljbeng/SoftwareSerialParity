@@ -1,6 +1,6 @@
 
 #include <SoftwareSerialParity.h>
-SoftwareSerialParity mySerial(2, 3); // RX, TX  (3, 2) for first pro mini boards 
+SoftwareSerialParity mySerial(2, 3); // RX, TX
 
 void setup() {
   // put your setup code here, to run once:
