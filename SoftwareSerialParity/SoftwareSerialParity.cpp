@@ -437,10 +437,25 @@ size_t SoftwareSerialParity::write(uint8_t b)
   uint8_t oldSREG = SREG;
   bool inv = _inverse_logic;
   uint16_t delay = _tx_delay;
-
+  if (F_CPU == 1000000L) {
+    delay -= 1;
+  }
+  
   if (inv)
     b = ~b;
 
+  Cparity = 0;
+  // Calculate parity
+  for (uint8_t i = 8, cb = b; i > 0; --i, cb >>= 1)
+  {
+    Cparity += (cb & 1);
+  }
+  if (Tparity != EVEN) 
+  {
+    Cparity = ~ Cparity;
+  }
+  
+  uint8_t i = 8; // shifts the first bit upfront
   cli();  // turn off interrupts for a clean txmit
 
   // Write the start bit
@@ -450,46 +465,39 @@ size_t SoftwareSerialParity::write(uint8_t b)
     *reg &= inv_mask;
 
   tunedDelay(delay);
-  Cparity = 0;
+
   // Write each of the 8 bits
-  for (uint8_t i = 8; i > 0; --i)
+  for (; i > 0; --i)
   {
-    if (b & 1){ // choose bit
+    if (b & 1) // choose bit
       *reg |= reg_mask; // send 1
-	  Cparity++;
-	}
-    else{
+    else 
       *reg &= inv_mask; // send 0
-	}
+
     tunedDelay(delay);
     b >>= 1;
   }
 
-    if (Tparity == ODD){ //odd parity
-		if (Cparity & 1) // choose bit
-		  *reg &= inv_mask; // send 0
-		else
-		  *reg |= reg_mask; // send 1
+  // Send parity or a stop bit
+  // The EVEN/ODD selection is adjusted outside the critical timing
+  // The Parity bit is slightly delayed. If that is a problem.
+  // remove the next line. In case of partity NONE a seconds stop
+  // bit will be sent.
+  if (Tparity != NONE) {
+    if (Cparity & 1) // choose bit
+      *reg |= reg_mask; // send 1
+    else
+      *reg &= inv_mask; // send 0
 
-		tunedDelay(delay);
-	}
-
-    if (Tparity == EVEN){ //even parity
-		if (Cparity & 1) // choose bit
-		  *reg |= reg_mask; // send 1
-		else
-		  *reg &= inv_mask; // send 0
-
-		tunedDelay(delay);
-	}
-
+    tunedDelay(delay);
+  }
 
 	// restore pin to natural state
   if (inv)
     *reg &= inv_mask;
   else
     *reg |= reg_mask;
-
+  
   SREG = oldSREG; // turn interrupts back on
   tunedDelay(_tx_delay);
   
