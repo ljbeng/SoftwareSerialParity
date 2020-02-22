@@ -140,6 +140,8 @@ void SoftwareSerialParity::recv()
 #endif  
 
   uint8_t d = 0;
+  uint8_t bitmask = (1 << Tbits) - 1;
+  uint8_t bitshift = 8 - Tbits;
 
   // If RX line is high, then we don't see any start bit
   // so interrupt is probably not for us
@@ -154,8 +156,8 @@ void SoftwareSerialParity::recv()
     tunedDelay(_rx_delay_centering);
     DebugPulse(_DEBUG_PIN2, 1);
 
-    // Read each of the 8 bits
-    for (uint8_t i=8; i > 0; --i)
+    // Read each of the 7 or 8 bits
+    for (uint8_t i=Tbits; i > 0; --i)
     {
       tunedDelay(_rx_delay_intrabit);
       d >>= 1;
@@ -163,6 +165,10 @@ void SoftwareSerialParity::recv()
       if (rx_pin_read())
         d |= 0x80;
     }
+    
+    // if (Tbits < 8) {
+        d = (d >> bitshift) & bitmask;  // Adjust for bits < 8
+    //}
 
     if (_inverse_logic)
       d = ~d;
@@ -177,7 +183,7 @@ void SoftwareSerialParity::recv()
     } 
     else 
     {
-      DebugPulse(_DEBUG_PIN1, 1);
+      // DebugPulse(_DEBUG_PIN1, 1);
       _buffer_overflow = true;
     }
 
@@ -308,7 +314,13 @@ void SoftwareSerialParity::begin(long speed,uint8_t parity)
 
   // Precalculate the various delays, in number of 4-cycle delays
   uint16_t bit_delay = (F_CPU / speed) / 4;
-  Tparity = parity;
+  // The parity value is coded into bits 4 and 5
+  // and the values for NONE, EVEN and ODD matches these
+  Tparity = (parity >> 4) & 0x03; 
+  // Stop bits
+  Tstop = parity & 0x08 ? 2 : 1; // Stop bit is coded into bit 3
+  // Set bit length
+  Tbits = ((parity >> 1) & 0x03) + 5; // Bit length scales with bits 1 and 2
 
   // 12 (gcc 4.8.2) or 13 (gcc 4.3.2) cycles from start bit to first bit,
   // 15 (gcc 4.8.2) or 16 (gcc 4.3.2) cycles between bits,
@@ -346,10 +358,10 @@ void SoftwareSerialParity::begin(long speed,uint8_t parity)
     // time for ISR cleanup, which makes 115200 baud at 16Mhz work more
     // reliably
     
-	if (Tparity != NONE)
-		_rx_delay_stopbit = subtract_cap(2 * bit_delay * 3 / 4, (37 + 11) / 4);
-	else
-		_rx_delay_stopbit = subtract_cap(bit_delay * 3 / 4, (37 + 11) / 4);
+	if (Tparity == NONE)
+		_rx_delay_stopbit = subtract_cap((bit_delay * (Tstop - 1) + bit_delay * 3 / 4), (37 + 11) / 4);
+  else
+		_rx_delay_stopbit = subtract_cap((bit_delay * Tstop + bit_delay * 3 / 4), (37 + 11) / 4);
 	
 	
     #else // Timings counted from gcc 4.3.2 output
@@ -358,7 +370,11 @@ void SoftwareSerialParity::begin(long speed,uint8_t parity)
     // 38400 on 8Mhz.
     _rx_delay_centering = subtract_cap(bit_delay / 2, (4 + 4 + 97 + 29 - 11) / 4);
     _rx_delay_intrabit = subtract_cap(bit_delay, 11 / 4);
-    _rx_delay_stopbit = subtract_cap(bit_delay * 3 / 4, (44 + 17) / 4);
+
+	if (Tparity == NONE)
+    _rx_delay_stopbit = subtract_cap((bit_delay * (Tstop - 1) + bit_delay * 3 / 4), (44 + 17) / 4);
+	else
+    _rx_delay_stopbit = subtract_cap((bit_delay * Tstop + bit_delay * 3 / 4), (44 + 17) / 4);
     #endif
 
 
@@ -446,16 +462,16 @@ size_t SoftwareSerialParity::write(uint8_t b)
 
   Cparity = 0;
   // Calculate parity
-  for (uint8_t i = 8, cb = b; i > 0; --i, cb >>= 1)
+  for (uint8_t i = Tbits, cb = b; i > 0; --i, cb >>= 1)
   {
     Cparity += (cb & 1);
   }
-  if (Tparity != EVEN) 
+  if (Tparity == ODD) 
   {
     Cparity = ~ Cparity;
   }
   
-  uint8_t i = 8; // shifts the first bit upfront
+  uint8_t i = Tbits; // shifts the first bit upfront
   cli();  // turn off interrupts for a clean txmit
 
   // Write the start bit
@@ -478,17 +494,14 @@ size_t SoftwareSerialParity::write(uint8_t b)
     b >>= 1;
   }
 
-  // Send parity or a stop bit
+  // Send parity
   // The EVEN/ODD selection is adjusted outside the critical timing
-  // The Parity bit is slightly delayed. If that is a problem.
-  // remove the next line. In case of partity NONE a seconds stop
-  // bit will be sent.
+
   if (Tparity != NONE) {
     if (Cparity & 1) // choose bit
       *reg |= reg_mask; // send 1
     else
       *reg &= inv_mask; // send 0
-
     tunedDelay(delay);
   }
 
@@ -499,7 +512,7 @@ size_t SoftwareSerialParity::write(uint8_t b)
     *reg |= reg_mask;
   
   SREG = oldSREG; // turn interrupts back on
-  tunedDelay(_tx_delay);
+  tunedDelay(_tx_delay * Tstop);
   
   return 1;
 }

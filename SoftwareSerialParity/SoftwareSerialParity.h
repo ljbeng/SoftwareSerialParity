@@ -43,9 +43,9 @@ http://arduiniana.org.
 #ifndef GCC_VERSION
 #define GCC_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
 #endif
-  const uint8_t ODD = 0;
-  const uint8_t NONE = 1;
-  const uint8_t EVEN = 2;
+const uint8_t NONE = 0;
+const uint8_t EVEN = 2;
+const uint8_t ODD = 3;
 class SoftwareSerialParity : public Stream
 {
 private:
@@ -54,6 +54,9 @@ private:
   uint8_t _receiveBitMask;
   uint8_t Tparity;
   uint8_t Cparity;  
+  uint8_t Tbits;
+  uint8_t Tstop;
+
   volatile uint8_t *_receivePortRegister;
   uint8_t _transmitBitMask;
   volatile uint8_t *_transmitPortRegister;
