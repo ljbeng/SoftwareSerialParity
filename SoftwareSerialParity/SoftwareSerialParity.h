@@ -1,11 +1,11 @@
 /*
-SoftwareSerial.h (formerly NewSoftSerial.h) - 
+SoftwareSerial.h (formerly NewSoftSerial.h) -
 Multi-instance software serial library for Arduino/Wiring
 -- Interrupt-driven receive and other improvements by ladyada
    (http://ladyada.net)
 -- Tuning, circular buffer, derivation from class Print/Stream,
    multi-instance support, porting to 8MHz processors,
-   various optimizations, PROGMEM delay tables, inverse logic and 
+   various optimizations, PROGMEM delay tables, inverse logic and
    direct port writing by Mikal Hart (http://www.arduiniana.org)
 -- Pin change interrupt macros by Paul Stoffregen (http://www.pjrc.com)
 -- 20MHz processor support by Garrett Mace (http://www.macetech.com)
@@ -49,71 +49,85 @@ const uint8_t ODD = 3;
 class SoftwareSerialParity : public Stream
 {
 private:
-  // per object data
-  uint8_t _receivePin;
-  uint8_t _receiveBitMask;
-  uint8_t Tparity;
-  uint8_t Cparity;  
-  uint8_t Tbits;
-  uint8_t Tstop;
+    // per object data
+    uint8_t _receivePin;
+    uint8_t _receiveBitMask;
+    uint8_t Tparity;
+    uint8_t Cparity;
+    uint8_t Tbits;
+    uint8_t Tstop;
 
-  volatile uint8_t *_receivePortRegister;
-  uint8_t _transmitBitMask;
-  volatile uint8_t *_transmitPortRegister;
-  volatile uint8_t *_pcint_maskreg;
-  uint8_t _pcint_maskvalue;
+    volatile uint8_t *_receivePortRegister;
+    uint8_t _transmitBitMask;
+    volatile uint8_t *_transmitPortRegister;
+    volatile uint8_t *_pcint_maskreg;
+    uint8_t _pcint_maskvalue;
 
-  // Expressed as 4-cycle delays (must never be 0!)
-  uint16_t _rx_delay_centering;
-  uint16_t _rx_delay_intrabit;
-  uint16_t _rx_delay_stopbit;
-  uint16_t _tx_delay;
+    // Expressed as 4-cycle delays (must never be 0!)
+    uint16_t _rx_delay_centering;
+    uint16_t _rx_delay_intrabit;
+    uint16_t _rx_delay_stopbit;
+    uint16_t _tx_delay;
 
-  uint16_t _buffer_overflow:1;
-  uint16_t _inverse_logic:1;
+    uint16_t _buffer_overflow: 1;
+    uint16_t _inverse_logic: 1;
 
-  // static data
-  static uint8_t _receive_buffer[_SS_MAX_RX_BUFF]; 
-  static volatile uint8_t _receive_buffer_tail;
-  static volatile uint8_t _receive_buffer_head;
-  static SoftwareSerialParity *active_object;
+    // static data
+    static uint8_t _receive_buffer[_SS_MAX_RX_BUFF];
+    static volatile uint8_t _receive_buffer_tail;
+    static volatile uint8_t _receive_buffer_head;
+    static SoftwareSerialParity *active_object;
 
-  // private methods
-  inline void recv() __attribute__((__always_inline__));
-  uint8_t rx_pin_read();
-  void setTX(uint8_t transmitPin);
-  void setRX(uint8_t receivePin);
-  inline void setRxIntMsk(bool enable) __attribute__((__always_inline__));
+    // private methods
+    inline void recv() __attribute__((__always_inline__));
+    uint8_t rx_pin_read();
+    void setTX(uint8_t transmitPin);
+    void setRX(uint8_t receivePin);
+    inline void setRxIntMsk(bool enable) __attribute__((__always_inline__));
 
-  // Return num - sub, or 1 if the result would be < 1
-  static uint16_t subtract_cap(uint16_t num, uint16_t sub);
+    // Return num - sub, or 1 if the result would be < 1
+    static uint16_t subtract_cap(uint16_t num, uint16_t sub);
 
-  // private static method for timing
-  static inline void tunedDelay(uint16_t delay);
+    // private static method for timing
+    static inline void tunedDelay(uint16_t delay);
 
 public:
-  // public methods
-  SoftwareSerialParity(uint8_t receivePin, uint8_t transmitPin, bool inverse_logic = false);
-  ~SoftwareSerialParity();
-  void begin(long speed, uint8_t parity);
-  bool listen();
-  void end();
-  bool isListening() { return this == active_object; }
-  bool stopListening();
-  bool overflow() { bool ret = _buffer_overflow; if (ret) _buffer_overflow = false; return ret; }
-  int peek();
+    // public methods
+    SoftwareSerialParity(uint8_t receivePin, uint8_t transmitPin, bool inverse_logic = false);
+    ~SoftwareSerialParity();
+    void begin(long speed, uint8_t parity);
+    bool listen();
+    void end();
+    bool isListening()
+    {
+        return this == active_object;
+    }
+    bool stopListening();
+    bool overflow()
+    {
+        bool ret = _buffer_overflow;
+        if (ret)
+        {
+            _buffer_overflow = false;
+        }
+        return ret;
+    }
+    int peek();
 
-  virtual size_t write(uint8_t byte);
-  virtual int read();
-  virtual int available();
-  virtual void flush();
-  operator bool() { return true; }
+    virtual size_t write(uint8_t byte);
+    virtual int read();
+    virtual int available();
+    virtual void flush();
+    operator bool()
+    {
+        return true;
+    }
 
-  
-  using Print::write;
 
-  // public only for easy access by interrupt handlers
-  static inline void handle_interrupt() __attribute__((__always_inline__));
+    using Print::write;
+
+    // public only for easy access by interrupt handlers
+    static inline void handle_interrupt() __attribute__((__always_inline__));
 };
 
 // Arduino 0012 workaround
