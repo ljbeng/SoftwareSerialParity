@@ -324,19 +324,24 @@ uint16_t SoftwareSerialParity::subtract_cap(uint16_t num, uint16_t sub)
 // Public methods
 //
 
-void SoftwareSerialParity::begin(long speed, uint8_t parity)
+void SoftwareSerialParity::begin(long speed, uint8_t config)
 {
     _rx_delay_centering = _rx_delay_intrabit = _rx_delay_stopbit = _tx_delay = 0;
 
     // Precalculate the various delays, in number of 4-cycle delays
     uint16_t bit_delay = (F_CPU / speed) / 4;
+    // config is a kind of bit field with the information:
+    // Pattern xxppsbbx
+    // pp -> Parity
+    // s -> Stop bits
+    // bb -> Bits 
     // The parity value is coded into bits 4 and 5
     // and the values for NONE, EVEN and ODD matches these
-    Tparity = (parity >> 4) & 0x03;
+    Tparity = (config >> 4) & 0x03;
     // Stop bits
-    Tstop = parity & 0x08 ? 2 : 1; // Stop bit is coded into bit 3
+    Tstop = config & 0x08 ? 2 : 1; // Stop bit is coded into bit 3
     // Set bit length
-    Tbits = ((parity >> 1) & 0x03) + 5; // Bit length scales with bits 1 and 2
+    Tbits = ((config >> 1) & 0x03) + 5; // Bit length scales with bits 1 and 2
 
     // 12 (gcc 4.8.2) or 13 (gcc 4.3.2) cycles from start bit to first bit,
     // 15 (gcc 4.8.2) or 16 (gcc 4.3.2) cycles between bits,
